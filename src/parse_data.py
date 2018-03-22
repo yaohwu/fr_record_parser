@@ -1,8 +1,11 @@
 # coding: utf-8
 # author: yaoh.wu
+#
 import csv
 import logging
 import re
+
+import sys
 
 # 原始数据合法起始字段正则
 data_pattern = r"^\"[0-9]{7}\"\t\""
@@ -29,6 +32,9 @@ page_size = 10000
 
 
 def main():
+    """
+    main
+    """
     # 配置日志
     logging.basicConfig(
         format='%(asctime)s %(pathname)s line:%(lineno)d %(message)s ',
@@ -53,10 +59,16 @@ def main():
     # 第三步
     # 类别特征编码，将tname，userrole等类别特征进行编码
 
+    sys.exit()
+
 
 def simple_parse_data():
+    """
+    先简单的处理一下数据，
+    主要目的是数据清理，移除乱码的数据以及在文本中错误的换行修正
+    """
     logging.info("simple parse data begin")
-    # 主要目的是移除乱码数据以及修正换行
+
     # 临时数据列表
     tmp_data_list = []
     tmp_line = ""
@@ -99,6 +111,10 @@ def simple_parse_data():
 
 
 def divide_parsed_data():
+    """
+    以ip,username,userrole 三个字段不为空为标准，将数据划分开
+    分为：用户访问数据 和 定时调度使用数据 两部分
+    """
     logging.info("divide parsed data begin")
     # 用户数据临时数据列表
     user_tmp_list = []
@@ -135,7 +151,11 @@ def divide_parsed_data():
 
 
 def __save_to_file(data, target_file_path):
-    # 存储到文件系统中
+    """
+    存储到文件系统中
+    :param data: 数据列表
+    :param target_file_path: 文件路径
+    """
     with open(target_file_path, "a", newline="", encoding="utf-8") as file:
         writer = csv.writer(file, dialect="excel")
         for item in data:
@@ -147,13 +167,20 @@ def __save_to_file(data, target_file_path):
                 continue
 
 
-# 粗略处理一下数据,移除一些乱码的信息
 def __parse_data(line):
+    """
+    粗略处理一下数据，移除一些乱码的信息
+    :param line: 字符串数据
+    :return: 修正好的，删除了部分暂时无用数据之后的数据 字符串列表
+    """
     # line 已经通过decode转成字符串了
     # 转小写,去除前后空格,去除双引号,拆分
     line = line.lower().strip().lstrip("\"").rstrip("\"").split("\"\t\"")
     # ['id', 'tname', 'type', 'param', 'ip', 'username', 'userrole', 'time', 'logtime', 'sql', 'browser', 'memory']
     # 删除param,sql,browser等信息
+    # 部分模板路径以 / 开头
+    if line[1].startswith("/"):
+        line[1] = line[1].replace("/", "", 1)
     # param
     del line[3]
     # sql
@@ -164,8 +191,12 @@ def __parse_data(line):
 
 
 def __save_to_database(data):
+    """
+    保存到数据库中
+    :param data: 数据
+    :return: 保存成功的数据
+    """
     # todo 存储到数据库中
-    # 存储到数据库中
     return data
 
 
