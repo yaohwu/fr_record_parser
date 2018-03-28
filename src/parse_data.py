@@ -56,6 +56,9 @@ def main():
     # 数据格式是由第一步生成的csv数据格式，将存在ip,username,userrole的数据同其他数据分隔开
     divide_parsed_data()
 
+    # 2.1 做一下计数，为特征编码做准备
+    count_parsed_user_data()
+
     # 第三步
     # 类别特征编码，将tname，userrole等类别特征进行编码
 
@@ -148,6 +151,50 @@ def divide_parsed_data():
     schedule_tmp_list.clear()
 
     logging.info("divide parsed data end")
+
+
+def count_parsed_user_data():
+    """
+    针对用户名称，模板名称，用户角色做一下计数
+    """
+    # fr_data_user.csv
+    # id,tname,type,ip,username,userrole,time,logtime,memory
+    # tname
+    tpl_list = []
+    tpl_tmp = []
+    # username
+    user_list = []
+    user_tmp = []
+    # userrole
+    user_role_list = []
+    user_role_tmp = []
+    # count
+    count_list = []
+
+    with open(user_data_file_path, encoding="utf-8", newline="") as f:
+        f_csv = csv.reader(f, dialect="excel")
+        for row in f_csv:
+            tpl_tmp.append(row[1])
+            user_tmp.append(row[4])
+            user_role_tmp.append(row[5])
+
+    for row in set(tpl_tmp):
+        tpl_list.append([row])
+    for row in set(user_tmp):
+        user_list.append([row])
+    for row in set(user_role_tmp):
+        user_role_list.append([row])
+
+    __save_to_file(tpl_list, "../data/fr_data_tpl_count.csv")
+    __save_to_file(user_list, "../data/fr_data_user_count.csv")
+    __save_to_file(user_role_list, "../data/fr_data_userrole_count.csv")
+
+    # count
+    count_list.append(["tpl_count", "user_count", "user_role_count"])
+    count_list.append([len(tpl_list), len(user_list), len(user_role_list)])
+    __save_to_file(count_list, "../data/fr_data_count.csv")
+
+    logging.info("count data end")
 
 
 def __save_to_file(data, target_file_path):
