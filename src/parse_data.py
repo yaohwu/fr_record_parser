@@ -93,7 +93,7 @@ def simple_parse_data():
                     tmp_data_list.append(data)
                     # 分块写入文件,避免占用大量内存
                     if len(tmp_data_list) > page_size:
-                        __save_to_file(tmp_data_list, parsed_data_file_path)
+                        save_to_file(tmp_data_list, parsed_data_file_path)
                         tmp_data_list.clear()
             # 下一个session id的信息
             tmp_line = line.replace("\r\n", "\n").replace("\n", "")
@@ -104,11 +104,11 @@ def simple_parse_data():
         tmp_data_list.append(data)
         # 分块写入文件,避免占用大量内存
         if len(tmp_data_list) > page_size:
-            __save_to_file(tmp_data_list, parsed_data_file_path)
+            save_to_file(tmp_data_list, parsed_data_file_path)
             tmp_data_list.clear()
 
     # 最后再处理一下末尾阶段不足1000条的数据
-    __save_to_file(tmp_data_list, parsed_data_file_path)
+    save_to_file(tmp_data_list, parsed_data_file_path)
     tmp_data_list.clear()
     logging.info("simple parse data end")
 
@@ -136,18 +136,18 @@ def divide_parsed_data():
             if row[4] != "" and row[5] != "" and row[6] != "":
                 user_tmp_list.append(row)
                 if len(user_tmp_list) > page_size:
-                    __save_to_file(user_tmp_list, user_data_file_path)
+                    save_to_file(user_tmp_list, user_data_file_path)
                     user_tmp_list.clear()
             else:
                 schedule_tmp_list.append(row)
                 if len(schedule_tmp_list) > page_size:
-                    __save_to_file(schedule_tmp_list, schedule_data_file_path)
+                    save_to_file(schedule_tmp_list, schedule_data_file_path)
                     schedule_tmp_list.clear()
 
     # 最后再处理一下末尾阶段不足1000条的数据
-    __save_to_file(user_tmp_list, user_data_file_path)
+    save_to_file(user_tmp_list, user_data_file_path)
     user_tmp_list.clear()
-    __save_to_file(schedule_tmp_list, schedule_data_file_path)
+    save_to_file(schedule_tmp_list, schedule_data_file_path)
     schedule_tmp_list.clear()
 
     logging.info("divide parsed data end")
@@ -185,19 +185,19 @@ def count_parsed_user_data():
     for row in set(user_role_tmp):
         user_role_list.append([row])
 
-    __save_to_file(tpl_list, "../data/fr_data_tpl_count.csv")
-    __save_to_file(user_list, "../data/fr_data_user_count.csv")
-    __save_to_file(user_role_list, "../data/fr_data_userrole_count.csv")
+    save_to_file(tpl_list, "../data/fr_data_tpl_count.csv")
+    save_to_file(user_list, "../data/fr_data_user_count.csv")
+    save_to_file(user_role_list, "../data/fr_data_userrole_count.csv")
 
     # count
     count_list.append(["tpl_count", "user_count", "user_role_count"])
     count_list.append([len(tpl_list), len(user_list), len(user_role_list)])
-    __save_to_file(count_list, "../data/fr_data_count.csv")
+    save_to_file(count_list, "../data/fr_data_count.csv")
 
     logging.info("count data end")
 
 
-def __save_to_file(data, target_file_path):
+def save_to_file(data, target_file_path):
     """
     存储到文件系统中
     :param data: 数据列表
