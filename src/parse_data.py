@@ -3,11 +3,11 @@
 #
 import csv
 import logging
+# 原始数据合法起始字段正则
+import os
 import re
-
 import sys
 
-# 原始数据合法起始字段正则
 data_pattern = r"^\"[0-9]{7}\"\t\""
 
 # 原始数据路径
@@ -68,6 +68,8 @@ def simple_parse_data():
     """
     logging.info("simple parse data begin")
 
+    os.remove(parsed_data_file_path)
+
     # 临时数据列表
     tmp_data_list = []
     tmp_line = ""
@@ -115,6 +117,9 @@ def divide_parsed_data():
     分为：用户访问数据 和 定时调度使用数据 两部分
     """
     logging.info("divide parsed data begin")
+    os.remove(user_data_file_path)
+    os.remove(schedule_data_file_path)
+
     # 用户数据临时数据列表
     user_tmp_list = []
     # 定时调度数据临时数据列表
@@ -150,6 +155,11 @@ def divide_parsed_data():
 
 
 def count_parsed_user_data():
+    # 移除旧的存储文件
+    os.remove(tpl_count_file_path)
+    os.remove(user_count_file_path)
+    os.remove(user_role_count_file_path)
+    os.remove(common_count_file_path)
     """
     针对用户名称，模板名称，用户角色做一下计数
     """
@@ -169,6 +179,8 @@ def count_parsed_user_data():
 
     with open(user_data_file_path, encoding="utf-8", newline="") as f:
         f_csv = csv.reader(f, dialect="excel")
+        # 去除标题
+        next(f_csv)
         for row in f_csv:
             tpl_tmp.append(row[1])
             user_tmp.append(row[4])
@@ -264,4 +276,4 @@ if __name__ == '__main__':
     # 第三步
     # 类别特征编码，将tname，userrole等类别特征进行编码
 
-    sys.exit()
+    sys.exit(0)
