@@ -25,9 +25,25 @@ user_data_file_path = "../data/fr_data_user.csv"
 # 其他可能是由定时调度触发计算的数据
 schedule_data_file_path = "../data/fr_data_schedule.csv"
 
+# 用户名计数文件路径
+user_count_file_path = "../data/fr_data_user_count.csv"
+
+# 模板名计数文件路径
+tpl_count_file_path = "../data/fr_data_tpl_count.csv"
+
+# 用户角色计数文件路径
+user_role_count_file_path = "../data/fr_data_userrole_count.csv"
+
+# 综合计数文件路径
+common_count_file_path = "../data/fr_data_count.csv"
+
+# 综合计数文件表头
+common_count_title = ["tpl_count", "user_count", "user_role_count"]
+
 # 日志文件路径
 log_file_path = "../log/log.log"
 
+# 存储文件的窗口大小
 page_size = 10000
 
 
@@ -43,26 +59,6 @@ def main():
         filename=log_file_path,
         level=logging.INFO
     )
-
-    # 第一步
-    # 数据格式"ID"\t"tname"\t"type"\t"param"\t"ip"\t"username"\t"userrole"\t"time"\t"logtime"\t"sql"\t"browser"\t"memory"
-    # 其中在sql和param处可能会额外换行，因此先将换行调账一下
-    # 先粗略地处理一下原始数据,
-    # 移除存在乱码的数据
-    # 存储在csv文件中
-    simple_parse_data()
-
-    # 第二步
-    # 数据格式是由第一步生成的csv数据格式，将存在ip,username,userrole的数据同其他数据分隔开
-    divide_parsed_data()
-
-    # 2.1 做一下计数，为特征编码做准备
-    count_parsed_user_data()
-
-    # 第三步
-    # 类别特征编码，将tname，userrole等类别特征进行编码
-
-    sys.exit()
 
 
 def simple_parse_data():
@@ -185,14 +181,14 @@ def count_parsed_user_data():
     for row in set(user_role_tmp):
         user_role_list.append([row])
 
-    save_to_file(tpl_list, "../data/fr_data_tpl_count.csv")
-    save_to_file(user_list, "../data/fr_data_user_count.csv")
-    save_to_file(user_role_list, "../data/fr_data_userrole_count.csv")
+    save_to_file(tpl_list, tpl_count_file_path)
+    save_to_file(user_list, user_count_file_path)
+    save_to_file(user_role_list, user_role_count_file_path)
 
     # count
-    count_list.append(["tpl_count", "user_count", "user_role_count"])
+    count_list.append(common_count_title)
     count_list.append([len(tpl_list), len(user_list), len(user_role_list)])
-    save_to_file(count_list, "../data/fr_data_count.csv")
+    save_to_file(count_list, common_count_file_path)
 
     logging.info("count data end")
 
@@ -249,3 +245,23 @@ def __save_to_database(data):
 
 if __name__ == '__main__':
     main()
+
+    # 第一步
+    # 数据格式"ID"\t"tname"\t"type"\t"param"\t"ip"\t"username"\t"userrole"\t"time"\t"logtime"\t"sql"\t"browser"\t"memory"
+    # 其中在sql和param处可能会额外换行，因此先将换行调账一下
+    # 先粗略地处理一下原始数据,
+    # 移除存在乱码的数据
+    # 存储在csv文件中
+    simple_parse_data()
+
+    # 第二步
+    # 数据格式是由第一步生成的csv数据格式，将存在ip,username,userrole的数据同其他数据分隔开
+    divide_parsed_data()
+
+    # 2.1 做一下计数，为特征编码做准备
+    count_parsed_user_data()
+
+    # 第三步
+    # 类别特征编码，将tname，userrole等类别特征进行编码
+
+    sys.exit()
