@@ -6,6 +6,9 @@ import os
 import sys
 import time
 
+import numpy as np
+from scipy.stats import pearsonr
+
 from parse_data import user_count_file_path, save_to_file, tpl_count_file_path, user_data_file_path
 
 # 用户名 id 对应文件
@@ -15,9 +18,39 @@ user_id_file_path = "../data/id/username.csv"
 
 tpl_id_file_path = "../data/id/tpl.csv"
 
+# 评分结果文件 列 为用户，行 为模板 793（用户）*1262（模板）
+result_path = "../data/id/result.csv"
+
 
 def main():
     pass
+
+
+def get_top_k_near_user(user_id, k):
+    users_p = []
+    tran_result = np.transpose(result)
+    for i in range(len(tran_result)):
+        # 只算有评过分的, 不然全是0，不准确
+        user_a = result[user_id]
+        user_b = result[i]
+
+        user_x = []
+        user_y = []
+
+        for inner in range(len(user_a)):
+            if user_a[inner] != 0 or user_b[inner] != 0:
+                user_x.append(user_a[inner])
+                user_y.append(user_b[inner])
+
+        if len(user_y) == 0:
+            # 值 推算不出来相似度，权当作完全不相似
+            users_p.append((i, -1))
+        else:
+            p, p_value = pearsonr(user_x, user_y)
+            users_p.append((i, p))
+
+    result_user = sorted(users_p, key=lambda user_p: user_p[1], reverse=True)
+    print(result_user)
 
 
 def allocate_id():
@@ -88,23 +121,42 @@ def kps(now_time):
                 score = 5
             else:
                 score = 0
-
+            # 存储分数
             if row[1] in tpls_kps:
-                tpls_kps[row[1]][row[4]] = score
+                if row[4] in tpls_kps[row[1]]:
+                    pre = tpls_kps[row[1]][row[4]]
+                    tpls_kps[row[1]][row[4]] = max(score, pre)
+                else:
+                    tpls_kps[row[1]][row[4]] = score
             else:
                 tpls_kps[row[1]] = {}
                 tpls_kps[row[1]][row[4]] = score
 
     for tpl in tpl_list:
-        tpl_kps = tpls_kps[tpl[0]]
         tpl_score = []
-        for user in user_list:
-            if user[0] in tpl_kps:
-                tpl_score.append(tpl_kps[user[0]])
-            else:
-                tpl_score.append(0)
+        # 模板是否有被预览过
+        if tpl[0] in tpls_kps.keys():
+            tpl_kps = tpls_kps[tpl[0]]
+            for user in user_list:
+                # 用户是否预览过该模板
+                if user[0] in tpl_kps.keys():
+                    tpl_score.append(tpl_kps[user[0]])
+                else:
+                    tpl_score.append(0)
+        else:
+            tpl_score = [0] * len(user_list)
+
         all_scores.append(tpl_score)
     return all_scores
+
+
+def read_result():
+    result_from_file = []
+    with open(result_path, encoding="utf-8", newline="") as f:
+        f_csv = csv.reader(f, dialect="excel")
+        for row in f_csv:
+            result_from_file.append(row)
+    return result_from_file
 
 
 if __name__ == '__main__':
@@ -116,6 +168,13 @@ if __name__ == '__main__':
         os.remove(tpl_id_file_path)
     user_list, tpl_list = allocate_id()
 
-    result = kps("2017/05/04 00:00:00")
+    result = kps("2017/05/18 00:00:00")
+    if os.path.exists(result_path):
+        os.remove(result_path)
+    save_to_file(result, result_path)
+
+    # kps 耗时太长了，直接从文件读上次的结果
+    # result = read_result()
+    get_top_k_near_user(77, 10)
 
     sys.exit(0)
