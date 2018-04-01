@@ -179,6 +179,6 @@ if __name__ == '__main__':
 
     # kps 耗时太长了，直接从文件读上次的结果
     # result = read_result()
-    # get_top_k_near_user(77, 10)
+    get_top_k_near_user(77, 10)
 
     sys.exit(0)
