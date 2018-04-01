@@ -38,11 +38,15 @@ def get_top_k_near_user(user_id, k):
         user_y = []
 
         for inner in range(len(user_a)):
-            if user_a[inner] != 0 or user_b[inner] != 0:
-                user_x.append(user_a[inner])
-                user_y.append(user_b[inner])
+            a = int(user_a[inner])
+            b = int(user_b[inner])
 
-        if len(user_y) == 0:
+            user_x.append(a)
+            user_y.append(b)
+        user_x = np.asarray(user_x)
+        user_y = np.asarray(user_y)
+
+        if user_x.mean() == 0 or user_y.mean() == 0:
             # 值 推算不出来相似度，权当作完全不相似
             users_p.append((i, -1))
         else:
@@ -90,11 +94,11 @@ def kps(now_time):
 
     now_time = time.mktime(time.strptime(now_time, "%Y/%m/%d %H:%M:%S"))
 
-    over10days = now_time - 10 * 24 * 60 * 60
-    over8days = now_time - 8 * 24 * 60 * 60
-    over6days = now_time - 6 * 24 * 60 * 60
-    over4days = now_time - 4 * 24 * 60 * 60
-    over2days = now_time - 2 * 24 * 60 * 60
+    over10days = now_time - 100 * 24 * 60 * 60
+    over8days = now_time - 80 * 24 * 60 * 60
+    over6days = now_time - 60 * 24 * 60 * 60
+    over4days = now_time - 40 * 24 * 60 * 60
+    over2days = now_time - 20 * 24 * 60 * 60
     # 所有评分
     all_scores = []
     # 模板的评分 key: tname value: user_ksp
@@ -168,13 +172,13 @@ if __name__ == '__main__':
         os.remove(tpl_id_file_path)
     user_list, tpl_list = allocate_id()
 
-    result = kps("2017/05/18 00:00:00")
+    result = kps("2017/11/10 00:00:00")
     if os.path.exists(result_path):
         os.remove(result_path)
     save_to_file(result, result_path)
 
     # kps 耗时太长了，直接从文件读上次的结果
     # result = read_result()
-    get_top_k_near_user(77, 10)
+    # get_top_k_near_user(77, 10)
 
     sys.exit(0)
