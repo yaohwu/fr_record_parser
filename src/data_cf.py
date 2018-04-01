@@ -49,11 +49,9 @@ def allocate_id():
     return username_id_list, tpl_id_list
 
 
-def kps(users, tpls, now_time):
+def kps(now_time):
     """
     计算兴趣程度
-    :param users:用户名id对应关系
-    :param tpls:模板名id对应关系
     :param now_time:计算兴趣程度的时间
     """
 
@@ -118,6 +116,6 @@ if __name__ == '__main__':
         os.remove(tpl_id_file_path)
     user_list, tpl_list = allocate_id()
 
-    result = kps(user_list, tpl_list, "2017/05/04 00:00:00")
+    result = kps("2017/05/04 00:00:00")
 
     sys.exit(0)
