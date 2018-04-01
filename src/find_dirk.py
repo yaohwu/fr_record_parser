@@ -1,6 +1,6 @@
-# coding: utf-8
+# encoding: utf-8
 # author: yaoh.wu
-#
+
 import csv
 import logging
 import os
@@ -30,7 +30,8 @@ def find_dirk():
         level=logging.INFO
     )
 
-    os.remove(dirk_path)
+    if os.path.exists(dirk_path):
+        os.remove(dirk_path)
 
     dirk_history = []
 
@@ -49,4 +50,4 @@ def find_dirk():
 if __name__ == '__main__':
     main()
     find_dirk()
-    sys.exit()
+    sys.exit(0)

@@ -1,6 +1,6 @@
-# coding: utf-8
+# encoding: utf-8
 # author: yaoh.wu
-#
+
 import csv
 import os
 import sys
@@ -111,10 +111,13 @@ def kps(users, tpls, now_time):
 
 if __name__ == '__main__':
     main()
-    os.remove(user_id_file_path)
-    os.remove(tpl_id_file_path)
+
+    if os.path.exists(user_id_file_path):
+        os.remove(user_id_file_path)
+    if os.path.exists(tpl_id_file_path):
+        os.remove(tpl_id_file_path)
     user_list, tpl_list = allocate_id()
 
     result = kps(user_list, tpl_list, "2017/05/04 00:00:00")
 
-    sys.exit()
+    sys.exit(0)
