@@ -30,9 +30,8 @@ def get_top_k_near_user(user_id, k):
     users_p = []
     tran_result = np.transpose(result)
     for i in range(len(tran_result)):
-        # 只算有评过分的, 不然全是0，不准确
-        user_a = result[user_id]
-        user_b = result[i]
+        user_a = tran_result[user_id]
+        user_b = tran_result[i]
 
         user_x = []
         user_y = []
@@ -52,9 +51,44 @@ def get_top_k_near_user(user_id, k):
         else:
             p, p_value = pearsonr(user_x, user_y)
             users_p.append((i, p))
-
-    result_user = sorted(users_p, key=lambda user_p: user_p[1], reverse=True)
+    # 拿掉相关系数为1的用户，因为是自身
+    result_user = sorted(users_p, key=lambda user_p: user_p[1], reverse=True)[1:(k + 1)]
     print(result_user)
+    return result_user
+
+
+def get_top_k_tpl_(result_user, k):
+    result_tpl_all = []
+    tran_result = np.transpose(result)
+
+    for i in range(len(result_user)):
+        user_id = result_user[i][0]
+        user_p = result_user[i][1]
+
+        tem_list = []
+        user_tpl_score = tran_result[user_id]
+        for t in range(len(user_tpl_score)):
+            tem_list.append((t, int(user_tpl_score[t]) * user_p))
+        result_per_user = sorted(tem_list, key=lambda tem: tem[1], reverse=True)[0:k]
+        result_tpl_all = result_tpl_all + result_per_user
+
+    result_filtered = []
+    result_map = {}
+    for i in range(len(result_tpl_all)):
+        tpl_id = result_tpl_all[i][0]
+        tpl_score = result_tpl_all[i][1]
+
+        if tpl_id in result_map:
+            result_map[tpl_id] = result_map[tpl_id] + tpl_score
+        else:
+            result_map[tpl_id] = tpl_score
+
+    for i in result_map:
+        result_filtered.append((i, result_map[i]))
+
+    res_list = sorted(result_filtered, key=lambda res: res[1], reverse=True)[0:k]
+    print(res_list)
+    return res_list
 
 
 def allocate_id():
@@ -163,6 +197,66 @@ def read_result():
     return result_from_file
 
 
+def get_user_name_by_id(user_id):
+    for i in range(len(user_list)):
+        if user_list[i][1] == user_id:
+            return user_list[i][0]
+    raise NameError("No such user")
+
+
+def get_tpl_name_by_id(tpl_id):
+    for i in range(len(tpl_list)):
+        if tpl_list[i][1] == tpl_id:
+            return tpl_list[i][0]
+    raise NameError("No such tpl")
+
+
+def model_score(user_id, res_tpl, predict_time):
+    res_tpl_name_list = []
+
+    for res in res_tpl:
+        res_tpl_name_list.append(get_tpl_name_by_id(res[0]))
+
+    num_predict_tpl = len(res_tpl_name_list)
+
+    time_f = time.mktime(time.strptime(predict_time, "%Y/%m/%d %H:%M:%S"))
+
+    after_2_time = time_f + 20 * 24 * 60 * 60
+
+    username = get_user_name_by_id(user_id)
+
+    real_preview_tpl = []
+    # id,tname,type,ip,username,userrole,time,logtime,memory
+    with open(user_data_file_path, encoding="utf-8", newline="") as f:
+        f_csv = csv.reader(f, dialect="excel")
+        # 去除标题
+        next(f_csv)
+        for row in f_csv:
+            if row[4] == username:
+                logtime = time.mktime(time.strptime(row[7], "%Y/%m/%d %H:%M:%S"))
+                if time_f < logtime < after_2_time:
+                    real_preview_tpl.append(row[1])
+
+    # 去重
+    real_preview_tpl = set(real_preview_tpl)
+    num_real_preview = len(real_preview_tpl)
+
+    num_precision_tpl = 0
+
+    for res_tpl_name in res_tpl_name_list:
+        if res_tpl_name in real_preview_tpl:
+            num_precision_tpl += 1
+    # 准确率 = 提取出的正确信息条数 /  提取出的信息条数
+    p = num_precision_tpl / num_predict_tpl
+    # 召回率 = 提取出的正确信息条数 /  样本中的信息条数
+    r = num_precision_tpl / num_real_preview
+    # f1 F值  = 正确率 * 召回率 * 2 / (正确率 + 召回率) （F 值即为正确率和召回率的调和平均值）
+    f1 = p * r * 2 / (p + r)
+
+    print("p: {p}  r: {r} f1: {f1}".format(p=p, r=r, f1=f1))
+    return p, r, f1
+
+
 if __name__ == '__main__':
     main()
 
@@ -172,13 +266,15 @@ if __name__ == '__main__':
         os.remove(tpl_id_file_path)
     user_list, tpl_list = allocate_id()
 
-    result = kps("2017/11/10 00:00:00")
-    if os.path.exists(result_path):
-        os.remove(result_path)
-    save_to_file(result, result_path)
+    # result = kps("2017/11/10 00:00:00")
+    # if os.path.exists(result_path):
+    #     os.remove(result_path)
+    # save_to_file(result, result_path)
 
-    # kps 耗时太长了，直接从文件读上次的结果
-    # result = read_result()
-    get_top_k_near_user(77, 10)
+    # 如果 kps 耗时太长了，直接从文件读上次的结果
+    result = read_result()
+    top_k_user = get_top_k_near_user(77, 10)
+    top_k_tpl = get_top_k_tpl_(top_k_user, 10)
+    model_score(77, top_k_tpl, "2017/11/10 00:00:00")
 
     sys.exit(0)
