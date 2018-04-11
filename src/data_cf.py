@@ -141,7 +141,7 @@ def kps(now_time):
     # id,tname,type,ip,username,userrole,time,logtime,memory
     with open(user_data_file_path, encoding="utf-8", newline="") as f:
         f_csv = csv.reader(f, dialect="excel")
-        # 跳过标配
+        # 跳过标题
         next(f_csv)
         for row in f_csv:
             logtime = time.mktime(time.strptime(row[7], "%Y/%m/%d %H:%M:%S"))
