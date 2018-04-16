@@ -6,6 +6,7 @@ import os
 import sys
 import time
 
+import matplotlib.pyplot as plt
 import numpy as np
 from scipy.stats import pearsonr
 
@@ -20,15 +21,11 @@ def main():
     print("data cf")
 
     # 待预测用户id
-    user_id = 531
-    # k
-    k = 5
+    user_id = 77
     # t
-    t = 5
+    t = 30
     # time
     predict_time = "2017/11/10 00:00:00"
-    # 遗忘因子
-    ffactor = 0.9
 
     if os.path.exists(user_id_file_path):
         os.remove(user_id_file_path)
@@ -38,27 +35,45 @@ def main():
 
     result, hots = evaluate_doi(predict_time, tpl_list, user_list, t)
 
-    if os.path.exists(doi_result_file_path):
-        os.remove(doi_result_file_path)
-    save_to_file(result, doi_result_file_path)
+    x = []
+    yp1 = []
+    yr1 = []
+    yp2 = []
+    yr2 = []
 
-    # 使用皮尔逊相关系数计算用户间的相似度
-    print("pearson:\n")
-    top_k_user = get_top_k_near_user(evaluate_pearson, user_id, k + 1, result)
-    top_k_tpl = get_top_k_tpl(top_k_user, k, result)
-    model_score(user_id, top_k_tpl, predict_time, tpl_list, user_list)
+    for i in range(1, 20):
+        x.append(i)
+        print("k: {k}".format(k=i))
+        k = i
+        if os.path.exists(doi_result_file_path):
+            os.remove(doi_result_file_path)
+        save_to_file(result, doi_result_file_path)
 
-    # 使用 Jaccard 相似度计算用户间的相似度
-    print("jaccard:\n")
-    top_k_user = get_top_k_near_user(evaluate_jaccard, user_id, k + 1, result)
-    top_k_tpl = get_top_k_tpl(top_k_user, k, result)
-    model_score(user_id, top_k_tpl, predict_time, tpl_list, user_list)
+        # 使用皮尔逊相关系数计算用户间的相似度
+        print("pearson:\n")
+        top_k_user = get_top_k_near_user(evaluate_pearson, user_id, k + 1, result)
+        top_k_tpl = get_top_k_tpl(top_k_user, k, result)
+        p1, r1, f11 = model_score(user_id, top_k_tpl, predict_time, tpl_list, user_list)
+        yp1.append(p1)
+        yr1.append(r1)
 
-    # 使用改进的 Jaccard 相似度计算用户间的相似度
-    print("jaccard v1:\n")
-    top_k_user = get_top_k_near_user(evaluate_jaccard_v1, user_id, k + 1, result)
-    top_k_tpl = get_top_k_tpl(top_k_user, k, result)
-    model_score(user_id, top_k_tpl, predict_time, tpl_list, user_list)
+        # 使用 Jaccard 相似度计算用户间的相似度
+        print("jaccard:\n")
+        top_k_user = get_top_k_near_user(evaluate_jaccard, user_id, k + 1, result)
+        top_k_tpl = get_top_k_tpl(top_k_user, k, result)
+        p2, r2, f12 = model_score(user_id, top_k_tpl, predict_time, tpl_list, user_list)
+        yp2.append(p2)
+        yr2.append(r2)
+
+    plt.plot(x, yp1, label='pearson p')
+    plt.plot(x, yp2, label='jaccard p')
+    plt.plot(x, yr1, label="pearson r")
+    plt.plot(x, yr2, label="jaccard r")
+    plt.xlabel('k')
+    plt.ylabel('p/r')
+    plt.title("k pr")
+    plt.legend()
+    plt.show()
 
 
 def evaluate_doi(now_time, tpl_list, user_list, t):
@@ -72,7 +87,7 @@ def evaluate_doi(now_time, tpl_list, user_list, t):
     now_time = time.mktime(time.strptime(now_time, "%Y/%m/%d %H:%M:%S"))
 
     # 过去t天的具体时间 秒（s）
-    over10days = now_time - t * 5 * 24 * 60 * 60
+    over10days = now_time - t * 24 * 60 * 60
     p_score = 1
 
     # 所有评分
@@ -95,7 +110,7 @@ def evaluate_doi(now_time, tpl_list, user_list, t):
             logtime = time.mktime(time.strptime(logtime, "%Y/%m/%d %H:%M:%S"))
 
             if logtime < over10days:
-                score = 0
+                continue
             elif now_time > logtime > over10days:
                 score = p_score
             else:
@@ -162,37 +177,6 @@ def evaluate_jaccard(all_doi, user_id):
                 union += 1
                 if a != 0 and b != 0:
                     intersect += 1
-        if union == 0:
-            p = 0
-        else:
-            p = intersect / union
-        users_p.append((i, p))
-    return users_p
-
-
-def evaluate_jaccard_v1(all_doi, user_id):
-    """
-    改进的jaccard 相似度
-    :param all_doi:
-    :param user_id:
-    :return:
-    """
-    users_p = []
-
-    for i in range(len(all_doi)):
-        user_a = all_doi[user_id]
-        user_b = all_doi[i]
-
-        if user_id == i:
-            continue
-        union = 0
-        intersect = 0
-        for inner in range(len(user_a)):
-            a = int(user_a[inner])
-            b = int(user_b[inner])
-            if a != 0 or b != 0:
-                union += 1
-                intersect += (5 - abs(a - b)) * 0.2
         if union == 0:
             p = 0
         else:
@@ -304,7 +288,7 @@ def model_score(user_id, res_tpl, predict_time, tpl_list, user_list):
 
     time_f = time.mktime(time.strptime(predict_time, "%Y/%m/%d %H:%M:%S"))
 
-    after_2_time = time_f + 1 * 5 * 24 * 60 * 60
+    after_2_time = time_f + 5 * 24 * 60 * 60
 
     username = get_user_name_by_id(user_id, user_list)
 
