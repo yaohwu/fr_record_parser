@@ -18,44 +18,62 @@ doi_result_file_path = "../data/cf_doi.csv"
 
 def main():
     print("data cf")
+
+    # 待预测用户id
+    user_id = 531
+    # k
+    k = 5
+    # t
+    t = 5
+    # time
+    predict_time = "2017/11/10 00:00:00"
+    # 遗忘因子
+    ffactor = 0.9
+
     if os.path.exists(user_id_file_path):
         os.remove(user_id_file_path)
     if os.path.exists(tpl_id_file_path):
         os.remove(tpl_id_file_path)
     user_list, tpl_list = allocate_id()
 
-    result = evaluate_doi("2017/11/10 00:00:00", 0.9, tpl_list, user_list)
+    result, hots = evaluate_doi(predict_time, tpl_list, user_list, t)
 
     if os.path.exists(doi_result_file_path):
         os.remove(doi_result_file_path)
     save_to_file(result, doi_result_file_path)
 
-    top_k_user = get_top_k_near_user(530, 5, result)
-    top_k_tpl = get_top_k_tpl(top_k_user, 5, result)
-    model_score(530, top_k_tpl, "2017/11/10 00:00:00", tpl_list, user_list)
+    # 使用皮尔逊相关系数计算用户间的相似度
+    print("pearson:\n")
+    top_k_user = get_top_k_near_user(evaluate_pearson, user_id, k + 1, result)
+    top_k_tpl = get_top_k_tpl(top_k_user, k, result)
+    model_score(user_id, top_k_tpl, predict_time, tpl_list, user_list)
+
+    # 使用 Jaccard 相似度计算用户间的相似度
+    print("jaccard:\n")
+    top_k_user = get_top_k_near_user(evaluate_jaccard, user_id, k + 1, result)
+    top_k_tpl = get_top_k_tpl(top_k_user, k, result)
+    model_score(user_id, top_k_tpl, predict_time, tpl_list, user_list)
+
+    # 使用改进的 Jaccard 相似度计算用户间的相似度
+    print("jaccard v1:\n")
+    top_k_user = get_top_k_near_user(evaluate_jaccard_v1, user_id, k + 1, result)
+    top_k_tpl = get_top_k_tpl(top_k_user, k, result)
+    model_score(user_id, top_k_tpl, predict_time, tpl_list, user_list)
 
 
-def evaluate_doi(now_time, tpl_list, user_list):
+def evaluate_doi(now_time, tpl_list, user_list, t):
     """
     计算兴趣程度
+    :param t: 计算的数据来源与前t天
     :param user_list: 用户名列表
     :param tpl_list: 模板列表
     :param now_time:计算兴趣程度的时间
     """
     now_time = time.mktime(time.strptime(now_time, "%Y/%m/%d %H:%M:%S"))
 
-    # 过去10，8，6，4，2 天的具体时间 秒（s）
-    over10days = now_time - 10 * 5 * 24 * 60 * 60
-    over8days = now_time - 8 * 5 * 24 * 60 * 60
-    over6days = now_time - 6 * 5 * 24 * 60 * 60
-    over4days = now_time - 4 * 5 * 24 * 60 * 60
-    over2days = now_time - 2 * 5 * 24 * 60 * 60
-    # 过去10。8，6，4，2 天一次预览对应的分数
-    over10_p = 1
-    over8_p = 2
-    over6_p = 3
-    over4_p = 4
-    over2_p = 5
+    # 过去t天的具体时间 秒（s）
+    over10days = now_time - t * 5 * 24 * 60 * 60
+    p_score = 1
 
     # 所有评分
     all_doi = []
@@ -72,24 +90,14 @@ def evaluate_doi(now_time, tpl_list, user_list):
             tname = row[1]
             # 用户名
             username = row[4]
-
             # logtime
             logtime = row[7]
-
             logtime = time.mktime(time.strptime(logtime, "%Y/%m/%d %H:%M:%S"))
 
             if logtime < over10days:
                 score = 0
-            elif over8days > logtime > over10days:
-                score = over10_p
-            elif over6days > logtime > over8days:
-                score = over8_p
-            elif over4days > logtime > over6days:
-                score = over6_p
-            elif over2days > logtime > over4days:
-                score = over4_p
-            elif now_time > logtime > over2days:
-                score = over2_p
+            elif now_time > logtime > over10days:
+                score = p_score
             else:
                 # 由于数据是时间有序的，因此如果logtime > now_time 就可以直接跳出了
                 break
@@ -102,9 +110,11 @@ def evaluate_doi(now_time, tpl_list, user_list):
             else:
                 all_tpl_kps[tname] = {}
                 all_tpl_kps[tname][username] = score
-
-    for tpl in tpl_list:
+    tpls_hot = []
+    for i in range(len(tpl_list)):
+        tpl = tpl_list[i]
         tpl_score = []
+        tpl_hot = 0
         # 模板是否有被预览过
         if tpl[0] in all_tpl_kps.keys():
             tpl_kps = all_tpl_kps[tpl[0]]
@@ -112,6 +122,8 @@ def evaluate_doi(now_time, tpl_list, user_list):
                 # 用户是否预览过该模板
                 if user[0] in tpl_kps.keys():
                     tpl_score.append(tpl_kps[user[0]])
+                    if tpl_kps[user[0]] != 0:
+                        tpl_hot += 1
                 else:
                     tpl_score.append(0)
         else:
@@ -119,17 +131,90 @@ def evaluate_doi(now_time, tpl_list, user_list):
             tpl_score = [0] * len(user_list)
 
         all_doi.append(tpl_score)
+        tpls_hot.append(tpl_hot)
 
     # 矩阵转置 从 793（用户）*1262（模板）转换成 1262（模板）*793（用户）
     all_doi = np.transpose(all_doi)
-    return all_doi
+    return all_doi, tpls_hot
 
 
-def get_top_k_near_user(user_id, k, all_doi):
+def evaluate_jaccard(all_doi, user_id):
+    """
+    改进的jaccard 相似度
+    :param all_doi:
+    :param user_id:
+    :return:
+    """
+    users_p = []
+
+    for i in range(len(all_doi)):
+        user_a = all_doi[user_id]
+        user_b = all_doi[i]
+
+        if user_id == i:
+            continue
+        union = 0
+        intersect = 0
+        for inner in range(len(user_a)):
+            a = int(user_a[inner])
+            b = int(user_b[inner])
+            if a != 0 or b != 0:
+                union += 1
+                if a != 0 and b != 0:
+                    intersect += 1
+        if union == 0:
+            p = 0
+        else:
+            p = intersect / union
+        users_p.append((i, p))
+    return users_p
+
+
+def evaluate_jaccard_v1(all_doi, user_id):
+    """
+    改进的jaccard 相似度
+    :param all_doi:
+    :param user_id:
+    :return:
+    """
+    users_p = []
+
+    for i in range(len(all_doi)):
+        user_a = all_doi[user_id]
+        user_b = all_doi[i]
+
+        if user_id == i:
+            continue
+        union = 0
+        intersect = 0
+        for inner in range(len(user_a)):
+            a = int(user_a[inner])
+            b = int(user_b[inner])
+            if a != 0 or b != 0:
+                union += 1
+                intersect += (5 - abs(a - b)) * 0.2
+        if union == 0:
+            p = 0
+        else:
+            p = intersect / union
+        users_p.append((i, p))
+    return users_p
+
+
+def evaluate_pearson(all_doi, user_id):
+    """
+    计算用户间的皮尔逊相关系数
+    :param all_doi: 兴趣程度矩阵
+    :param user_id: 用户id
+    :return: 用户相似度列表
+    """
     users_p = []
     for i in range(len(all_doi)):
         user_a = all_doi[user_id]
         user_b = all_doi[i]
+
+        if user_id == i:
+            continue
 
         user_x = []
         user_y = []
@@ -149,15 +234,22 @@ def get_top_k_near_user(user_id, k, all_doi):
         else:
             p, p_value = pearsonr(user_x, user_y)
             users_p.append((i, p))
-    # 拿掉相关系数为1的用户，因为是自身
-    result_user = sorted(users_p, key=lambda user_p: user_p[1], reverse=True)[1:(k + 1)]
+    return users_p
+
+
+def get_top_k_near_user(strategy, user_id, k, all_doi, hots=None):
+    if hots is None:
+        users_p = strategy(all_doi, user_id)
+    else:
+        users_p = strategy(all_doi, user_id, hots)
+    result_user = sorted(users_p, key=lambda user_p: user_p[1], reverse=True)[0:k]
     print(result_user)
     return result_user
 
 
 def get_top_k_tpl(result_user, k, all_doi):
     result_tpl_all = []
-
+    p_last = result_user[-1][1]
     for i in range(len(result_user)):
         user_id = result_user[i][0]
         user_p = result_user[i][1]
@@ -165,7 +257,7 @@ def get_top_k_tpl(result_user, k, all_doi):
         tem_list = []
         user_tpl_score = all_doi[user_id]
         for t in range(len(user_tpl_score)):
-            tem_list.append((t, int(user_tpl_score[t]) * user_p))
+            tem_list.append((t, int(user_tpl_score[t]) * (user_p - p_last)))
         result_per_user = sorted(tem_list, key=lambda tem: tem[1], reverse=True)[0:k]
         result_tpl_all = result_tpl_all + result_per_user
 
@@ -212,7 +304,7 @@ def model_score(user_id, res_tpl, predict_time, tpl_list, user_list):
 
     time_f = time.mktime(time.strptime(predict_time, "%Y/%m/%d %H:%M:%S"))
 
-    after_2_time = time_f + 2 * 5 * 24 * 60 * 60
+    after_2_time = time_f + 1 * 5 * 24 * 60 * 60
 
     username = get_user_name_by_id(user_id, user_list)
 
