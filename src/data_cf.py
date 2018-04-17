@@ -22,6 +22,7 @@ def main():
 
     # 待预测用户id
     user_id = 77
+
     # t
     t = 30
     # time
@@ -34,13 +35,17 @@ def main():
     user_list, tpl_list = allocate_id()
 
     result, hots = evaluate_doi(predict_time, tpl_list, user_list, t)
+    user_name = get_user_name_by_id(user_id, user_list)
 
     x = []
     yp1 = []
     yr1 = []
     yp2 = []
     yr2 = []
+    yp3 = []
+    yr3 = []
 
+    history_list = common_predict(predict_time, t, user_name, tpl_list, hots)
     for i in range(1, 20):
         x.append(i)
         print("k: {k}".format(k=i))
@@ -49,31 +54,78 @@ def main():
             os.remove(doi_result_file_path)
         save_to_file(result, doi_result_file_path)
 
-        # 使用皮尔逊相关系数计算用户间的相似度
-        print("pearson:\n")
-        top_k_user = get_top_k_near_user(evaluate_pearson, user_id, k + 1, result)
-        top_k_tpl = get_top_k_tpl(top_k_user, k, result)
-        p1, r1, f11 = model_score(user_id, top_k_tpl, predict_time, tpl_list, user_list)
-        yp1.append(p1)
-        yr1.append(r1)
+        # # 使用皮尔逊相关系数计算用户间的相似度
+        # print("pearson:")
+        # top_k_user = get_top_k_near_user(evaluate_pearson, user_id, k + 1, result)
+        # top_k_tpl = get_top_k_tpl(top_k_user, k, result)
+        # p1, r1, f11 = model_score(user_id, top_k_tpl, predict_time, tpl_list, user_list)
+        # yp1.append(p1)
+        # yr1.append(r1)
+        #
+        # # 使用 Jaccard 相似度计算用户间的相似度
+        # print("jaccard:")
+        # top_k_user = get_top_k_near_user(evaluate_jaccard, user_id, k + 1, result)
+        # top_k_tpl = get_top_k_tpl(top_k_user, k, result)
+        # p2, r2, f12 = model_score(user_id, top_k_tpl, predict_time, tpl_list, user_list)
+        # yp2.append(p2)
+        # yr2.append(r2)
 
-        # 使用 Jaccard 相似度计算用户间的相似度
-        print("jaccard:\n")
-        top_k_user = get_top_k_near_user(evaluate_jaccard, user_id, k + 1, result)
-        top_k_tpl = get_top_k_tpl(top_k_user, k, result)
-        p2, r2, f12 = model_score(user_id, top_k_tpl, predict_time, tpl_list, user_list)
-        yp2.append(p2)
-        yr2.append(r2)
+        print("common:")
+        top_k_tpl = sorted(history_list, key=lambda h: h[1], reverse=True)[0: k]
+        p3, r3, f13 = model_score(user_id, top_k_tpl, predict_time, tpl_list, user_list)
+        yp3.append(p3)
+        yr3.append(r3)
+        print("\n")
 
-    plt.plot(x, yp1, label='pearson p')
-    plt.plot(x, yp2, label='jaccard p')
-    plt.plot(x, yr1, label="pearson r")
-    plt.plot(x, yr2, label="jaccard r")
+    # plt.plot(x, yp1, label='pearson p')
+    # plt.plot(x, yp2, label='jaccard p')
+    # plt.plot(x, yr1, label="pearson r")
+    # plt.plot(x, yr2, label="jaccard r")
+
+    plt.plot(x, yp3, label='common p')
+    plt.plot(x, yr3, label='common r')
     plt.xlabel('k')
     plt.ylabel('p/r')
     plt.title("k pr")
     plt.legend()
     plt.show()
+
+
+def common_predict(now_time, t, username_predict, tpl_list, hots):
+    now_time = time.mktime(time.strptime(now_time, "%Y/%m/%d %H:%M:%S"))
+    # 过去t天的具体时间 秒（s）
+    over_t_days = now_time - t * 24 * 60 * 60
+    history = {}
+    with open(pure_data_file_path, encoding="utf-8", newline="") as f:
+        f_csv = csv.reader(f, dialect="excel")
+        # 跳过标题
+        next(f_csv)
+        for row in f_csv:
+            # 模板名
+            tname = row[1]
+            # 用户名
+            username = row[4]
+            # logtime
+            logtime = row[7]
+            logtime = time.mktime(time.strptime(logtime, "%Y/%m/%d %H:%M:%S"))
+
+            if logtime < over_t_days:
+                continue
+            elif now_time > logtime > over_t_days:
+                if username == username_predict:
+                    if tname in history.keys():
+                        history[tname] += 1
+                    else:
+                        history[tname] = 0
+            else:
+                # 由于数据是时间有序的，因此如果logtime > now_time 就可以直接跳出了
+                break
+    history_list = []
+    for t in range(len(tpl_list)):
+        tpl = tpl_list[t]
+        if tpl[0] in history.keys():
+            history_list.append((tpl[1], history[tpl[0]] / hots[tpl[1]]))
+    return history_list
 
 
 def evaluate_doi(now_time, tpl_list, user_list, t):
@@ -87,7 +139,7 @@ def evaluate_doi(now_time, tpl_list, user_list, t):
     now_time = time.mktime(time.strptime(now_time, "%Y/%m/%d %H:%M:%S"))
 
     # 过去t天的具体时间 秒（s）
-    over10days = now_time - t * 24 * 60 * 60
+    over_t_days = now_time - t * 24 * 60 * 60
     p_score = 1
 
     # 所有评分
@@ -109,9 +161,9 @@ def evaluate_doi(now_time, tpl_list, user_list, t):
             logtime = row[7]
             logtime = time.mktime(time.strptime(logtime, "%Y/%m/%d %H:%M:%S"))
 
-            if logtime < over10days:
+            if logtime < over_t_days:
                 continue
-            elif now_time > logtime > over10days:
+            elif now_time > logtime > over_t_days:
                 score = p_score
             else:
                 # 由于数据是时间有序的，因此如果logtime > now_time 就可以直接跳出了
@@ -283,7 +335,7 @@ def model_score(user_id, res_tpl, predict_time, tpl_list, user_list):
 
     for res in res_tpl:
         res_tpl_name_list.append(get_tpl_name_by_id(res[0], tpl_list))
-
+    print(res_tpl_name_list)
     num_predict_tpl = len(res_tpl_name_list)
 
     time_f = time.mktime(time.strptime(predict_time, "%Y/%m/%d %H:%M:%S"))
@@ -318,7 +370,10 @@ def model_score(user_id, res_tpl, predict_time, tpl_list, user_list):
     # 召回率 = 提取出的正确信息条数 /  样本中的信息条数
     r = num_precision_tpl / num_real_preview
     # f1 F值  = 正确率 * 召回率 * 2 / (正确率 + 召回率) （F 值即为正确率和召回率的调和平均值）
-    f1 = p * r * 2 / (p + r)
+    try:
+        f1 = p * r * 2 / (p + r)
+    except ZeroDivisionError:
+        f1 = 0
 
     print("p: {p}  r: {r} f1: {f1}".format(p=p, r=r, f1=f1))
     return p, r, f1
