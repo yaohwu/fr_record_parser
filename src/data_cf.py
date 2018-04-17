@@ -44,9 +44,11 @@ def main():
     yr2 = []
     yp3 = []
     yr3 = []
+    yp4 = []
+    yr4 = []
 
     history_list = common_predict(predict_time, t, user_name, tpl_list, hots)
-    for i in range(1, 20):
+    for i in range(2, 20):
         x.append(i)
         print("k: {k}".format(k=i))
         k = i
@@ -70,20 +72,35 @@ def main():
         # yp2.append(p2)
         # yr2.append(r2)
 
-        print("common:")
-        top_k_tpl = sorted(history_list, key=lambda h: h[1], reverse=True)[0: k]
-        p3, r3, f13 = model_score(user_id, top_k_tpl, predict_time, tpl_list, user_list)
-        yp3.append(p3)
-        yr3.append(r3)
-        print("\n")
+        # print("common:")
+        # top_k_tpl = sorted(history_list, key=lambda h: h[1], reverse=True)[0: k]
+        # p3, r3, f13 = model_score(user_id, top_k_tpl, predict_time, tpl_list, user_list)
+        # yp3.append(p3)
+        # yr3.append(r3)
+        # print("\n")
+        k1 = k // 2
+        k2 = k - k1
+        top_k_user = get_top_k_near_user(evaluate_pearson, user_id, k1 + 1, result)
+        top_k_tpl = get_top_k_tpl(top_k_user, k1, result)
+        # top_k_user = get_top_k_near_user(evaluate_jaccard, user_id, k1 + 1, result)
+        # top_k_tpl += get_top_k_tpl(top_k_user, k1, result)
+
+        top_k_tpl += sorted(history_list, key=lambda h: h[1], reverse=True)[0: k2]
+        p4, r4, f14 = model_score(user_id, top_k_tpl, predict_time, tpl_list, user_list)
+        yp4.append(p4)
+        yr4.append(r4)
 
     # plt.plot(x, yp1, label='pearson p')
     # plt.plot(x, yp2, label='jaccard p')
     # plt.plot(x, yr1, label="pearson r")
     # plt.plot(x, yr2, label="jaccard r")
 
-    plt.plot(x, yp3, label='common p')
-    plt.plot(x, yr3, label='common r')
+    # plt.plot(x, yp3, label='common p')
+    # plt.plot(x, yr3, label='common r')
+
+    plt.plot(x, yp4, label='p')
+    plt.plot(x, yr4, label='r')
+
     plt.xlabel('k')
     plt.ylabel('p/r')
     plt.title("k pr")
